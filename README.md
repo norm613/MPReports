@@ -26,10 +26,41 @@ So the flow is: **the stored procedure gets the data → the RDL turns it into a
 You need three things. If you don't have them, ask whoever manages your MinistryPlatform server (for dedicated-cloud customers, that's ACS Technologies / Higher Ground support).
 
 1. **SSMS** installed on your computer (free download from Microsoft).
-2. **Access to the report server** — the SSRS website, plus the login it asks for. This is a **Windows login for the server**, not your normal MinistryPlatform username.
+2. **Access to the report server** — the SSRS website, plus the login it asks for. This is a **Windows login for the server**, not your normal MinistryPlatform username. On Dedicated Cloud this usually means a **VPN login** to reach the server network *and* an **RDP login** to sign into the server itself (see "How server access works on Dedicated Cloud" below).
 3. **Setup Administrator** rights in MinistryPlatform (so you can add the report records later).
 
 > **Tip:** Practice in a "sandbox" (a test copy) first if you have one, and make a backup before you change anything.
+
+### How server access works on Dedicated Cloud
+
+If you're hosted on Dedicated Cloud with Higher Ground, you can request **VPN**
+and **RDP** credentials to your MP servers. You typically use **two logins, in
+order**:
+
+1. A **VPN login** — gets you *onto the server network* (nothing more). Higher Ground uses the **WatchGuard VPN Client**.
+2. An **RDP login** — signs you into the server's desktop with Remote Desktop. This **same login also signs you in to the SSRS report portal** — the portal uses your Windows login, so there is no separate report-portal password.
+
+How many servers you'll see depends on your tier:
+
+- **Tier 1** runs the web server and the database server on the **same VM** — one server to connect to.
+- **Tier 2 and above** run the web server and database server on **separate VMs**. For reports, you connect to the **database server** — that's where SSMS and the SSRS report portal both live (Reporting Services is part of SQL Server). You do **not** use the web server for report work.
+
+> **Worked example — St. Isidore parish (Dedicated Cloud Tier 2).**
+> Bob Builder needs to deploy these reports. Higher Ground sends him:
+>
+> | Item | Value |
+> |------|-------|
+> | VPN Username | `StIsidore-BBuilder` |
+> | VPN Password | `Password-VPN` |
+> | Server — **web** | `MP-STISIDORE-W` (`10.215.106.90`) — **Do Not Use** |
+> | Server — **database** | `MP-STISIDORE-S` (`10.215.106.91`) — **Connect Here** |
+> | RDP Server | `10.215.106.91` |
+> | RDP Username | `10.215.106.91\StIsidore-BBuilder` |
+> | RDP Password | `Password-RDP` |
+>
+> Bob (1) connects the **WatchGuard VPN Client** with `StIsidore-BBuilder` / `Password-VPN`, then (2) opens **Remote Desktop** to `MP-STISIDORE-S` (`10.215.106.91`) — the **database** server — signing in as `10.215.106.91\StIsidore-BBuilder` / `Password-RDP`. He ignores `MP-STISIDORE-W`, the web server. On the `-S` server he runs **SSMS** for Part 1 and opens the **SSRS report portal** for Part 2; the report portal takes that same RDP login.
+>
+> *(The names, IP addresses, and passwords above are made-up placeholders for illustration.)* The `10.215.106.91\StIsidore-BBuilder` form is a **local account on that server** — the part before the `\` is the server's own name (shown here as its IP).
 
 ## Part 1 — Add the stored procedure to the database
 
@@ -46,8 +77,8 @@ This teaches the database how to fetch the schedule data.
 
 This puts the actual reports onto the report server so they can run.
 
-1. Open the **SSRS website** in your web browser. The address is usually `https://Reports` or a link support gave you.
-2. When it asks you to log in, use the **Windows login for the server** (type it as `DOMAIN\username`). This is the login from the "Before you start" list — *not* your MinistryPlatform password.
+1. Open the **SSRS website** in your web browser. The address is usually `https://Reports` or a link support gave you. On Dedicated Cloud, do this **from inside the server** you connected to with Remote Desktop (the database server on Tier 2+).
+2. When it asks you to log in, use the **Windows login for the server** (type it as `DOMAIN\username`). On Dedicated Cloud this is your **RDP login** — the same one you used to sign into the server — *not* your MinistryPlatform password. (In the St. Isidore example above, that's `10.215.106.91\StIsidore-BBuilder` / `Password-RDP`.)
 3. Make a **new folder** to keep these reports in — for example, name it `MPReports`. (Keeping them in their own folder means MinistryPlatform's regular updates won't overwrite them.)
 4. Open your new folder, click **Upload**, and add all three `.rdl` files from the `Reports` folder of this project.
 5. Each report needs to know which database to talk to. This connection is called a **data source**. The easy option: use the one that already exists, named **`MPReportsDS`**.
